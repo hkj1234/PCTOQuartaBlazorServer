@@ -36,7 +36,7 @@ L'applicazione simula un negozio online, permettendo agli utenti di visualizzare
 
 ### Installazione
 
-1.  **Clona il repository:**
+**Clona il repository**
 
 ### Configurazione Database (Manuale)
 
