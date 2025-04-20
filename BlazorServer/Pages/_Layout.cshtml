@@ -1,0 +1,55 @@
+﻿@using Microsoft.AspNetCore.Components.Web
+@namespace BlazorServer.Pages
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <base href="~/" />
+
+    @* CSS *@
+    @* Font Awesome *@
+    <link href="_content/SmartDynamicBlazor/lib/font-awesome/css/all.min.css" rel="stylesheet" />
+
+    @* Blazorise *@
+    <link href="_content/Blazorise/blazorise.css" rel="stylesheet" />
+    <link href="_content/Blazorise.Bootstrap/blazorise.bootstrap.css" rel="stylesheet" />
+
+    @*Carico gli styles SmartDynamicBlazor & Bootstrap 4.7*@
+    <link href="_content/SmartDynamicBlazor/styles.min.css" rel="stylesheet" />
+
+    @* Custom *@
+    <link href="css/site.css" rel="stylesheet" />
+
+    <component type="typeof(HeadOutlet)" render-mode="Server" />
+</head>
+<body>
+    @RenderBody()
+
+    <div id="blazor-error-ui">
+        <environment include="Staging,Production">
+            An error has occurred. This application may no longer respond until reloaded.
+        </environment>
+        <environment include="Development">
+            An unhandled exception has occurred. See browser dev tools for details.
+        </environment>
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">🗙</a>
+    </div>
+
+    @* Smart Dynamic Blazor - SDB *@
+    <script src="_content/SmartDynamicBlazor/lib/jquery/jquery.slim.min.js"></script>
+    <script src="_content/SmartDynamicBlazor/lib/popper.js/umd/popper.min.js"></script>
+    <script src="_content/SmartDynamicBlazor/js/bootstrap.min.js"></script>
+    <script src="_content/SmartDynamicBlazor/js/sdb.main.js"></script>
+
+    @* ApplicationInsights client script *@
+    <script src="_content/BlazorApplicationInsights/JsInterop.js"></script>
+
+    @* Script base di Blazor*@
+    <script src="_framework/blazor.server.js"></script>
+
+</body>
+</html>

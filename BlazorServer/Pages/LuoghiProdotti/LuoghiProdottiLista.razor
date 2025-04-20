@@ -1,0 +1,89 @@
+﻿@page "/LuoghiProdotti"
+
+@* <SmartList Source="typeof(zStage_EF_TestContext)" TEntity="RelazioneNegozioProdotto"
+           MetaData="typeof(LuoghiProdottiMetaDataLista)" EditColumn="false">
+
+</SmartList> *@
+
+@implements IDisposable
+
+@inject IDbContextFactory<zStage_EF_TestContext> _dbFactory
+@inject NavigationManager _navigationManager
+@inject ILogger<LuoghiProdottiLista> _logger
+
+@* Error message *@
+<div class="mt-3">
+    <MessageErrorPanel @ref="_errorMessage" />
+</div>
+
+@if (!_databaseCaricato)
+{
+    <Loader Info="Caricamento in corso..." />
+}
+else
+{
+    <div class="d-flex flex-row align-items-center">
+        <Table>
+            <tr>
+                <td><b>Prodotto</b></td>
+                <td><b>Negozi</b></td>
+            </tr>
+            @foreach (var i in _relazioneResult)
+            {
+                <tr>
+                    <td>@i.NomeProdotto</td>
+                    <td>@i.NomiNegozi</td>
+                </tr>
+            }
+        </Table>
+    </div>
+}
+
+@code {
+    private List<ResultLuoghiProdotti> _relazioneResult;
+    private MessageErrorPanel _errorMessage;
+    private bool _databaseCaricato;
+
+    private zStage_EF_TestContext _dbContext { get; set; }
+    private ISmartForm _smartForm;
+
+    protected override void OnInitialized()
+    {
+        _dbContext = _dbFactory.CreateDbContext();
+        _relazioneResult = new List<ResultLuoghiProdotti>();
+        _databaseCaricato = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Solo la prima volta (come OnInitialized())
+        if (!firstRender)
+            return;
+
+        try
+        {
+            _relazioneResult = _dbContext.RelazioneNegozioProdotto
+                                .Include(x => x.IdNegozioNavigation)
+                                .Include(x => x.IdProdottoNavigation)
+                                .GroupBy(x => x.IdProdottoNavigation.Nome)
+                                .Select(x => new ResultLuoghiProdotti()
+                                    {
+                                        NomeProdotto = x.Key,
+                                        NomiNegozi = string.Join(", ", x.Select(Negozi => Negozi.IdNegozioNavigation.Nome))
+                                    })
+                                .ToList();
+            _databaseCaricato = true;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            string error = "Errore imprevisto. Contattare un amministratore!";
+            _errorMessage.Show(error);
+        }
+    }
+
+    public void Dispose()
+    {
+        _dbContext?.Dispose();
+    }
+}

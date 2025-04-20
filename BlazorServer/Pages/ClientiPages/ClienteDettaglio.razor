@@ -1,0 +1,312 @@
+﻿@page "/Cliente/new"
+@page "/Cliente/new/{CopyFromPrimaryKeys}"
+@page "/Cliente/{PrimaryKeysParam}"
+
+@implements IDisposable
+
+@inject IDbContextFactory<zStage_EF_TestContext> _dbFactory
+@inject NavigationManager _navigationManager
+@inject ILogger<ClienteDettaglio> _logger
+
+@* Error message *@
+<div class="mt-3">
+    <MessageErrorPanel @ref="_errorMessage" />
+</div>
+
+@if (!_itemFound.HasValue)
+{
+    <Loader Info="Caricamento in corso..." />
+}
+else
+{
+    <div class="d-flex flex-row align-items-center">
+
+        @* Tasto indietro *@
+        <i class="fas fa-chevron-left fa-lg text-primary pointer mr-2" @onclick="Back"></i>
+
+        @if (_itemFound.Value)
+        {
+            @if (_isNew)
+            {
+                <div class="page-title ml-2">Nuovo Cliente</div>
+            }
+            else
+            {
+                <div class="page-title ml-2">
+                    <b>Modifica Cliente - @_item?.Nome</b>
+                </div>
+                <div class="vertical-divider" />
+                <Blazorise.Bootstrap.Switch TValue="bool" Checked="@(!_isDisabled)" CheckedChanged="@((e) => _isDisabled = !e)" Disabled="@(!_isInizialized)" Size="Blazorise.Size.Medium">@(_isDisabled ? "Modifica disabilitata" : "Modifica abilitata")</Blazorise.Bootstrap.Switch>
+            }
+        }
+        else
+        {
+            <div class="page-title ml-2">Elemento non trovato</div>
+        }
+    </div>
+
+    @if (_itemFound.Value)
+    {
+        <div class="row no-gutters">
+            <div class="col-12 col-lg-10 col-xl-8">
+                <div class="div-white">
+
+                    <SmartForm @ref='_smartForm'
+                               TDbContext="zStage_EF_TestContext" DbContext="_dbContext" TEntity="Cliente" @bind-Entity="_item" MetaData="typeof(ClienteMetaDataDettaglio)"
+                               OnError="SmartForm_OnError" IsDisabled="_isDisabled" OnComponentLoaded="CheckFormInizialization">
+                    </SmartForm>
+                </div>
+
+
+
+                <div class="my-3">
+                    <SmartFormButton DeleteButtonName="Elimina" IsDeleteEnabled="@(!_isNew)" OnDeleteClick="(() => Delete())"
+                                     ModalTitle=@("Eliminare il Cliente?")
+                                     IsDisabled="@_isDisabled"
+                                     OnConfirmClick="(() => Confirm())"
+                                     OnCancelClick="(() => Back())"
+                                     OnSaveClick="(() => Apply())">
+                        <ModalBodyContent>
+                            Conferma di voler eliminare il Cliente?<br />Questa azione non è reversibile.
+                            <br /><i class="mt-2">Inoltre verranno eliminate tutte le relazioni collegate.</i>
+                        </ModalBodyContent>
+                    </SmartFormButton>
+                </div>
+
+            </div>
+        </div>
+    }
+}
+
+@code {
+
+    [Parameter] public string PrimaryKeysParam { get; set; }
+    [Parameter] public string CopyFromPrimaryKeys { get; set; }
+
+    #region Page variables
+    private bool _isNew => String.IsNullOrEmpty(PrimaryKeysParam);
+    private PrimaryKeysClass _primaryKeysClass;
+    private MessageErrorPanel _errorMessage;
+    private bool? _itemFound = null;
+    private bool _isDisabled = true;
+    private bool _isInizialized = false;
+    private Cliente _item;
+    private string _usernameRec;
+    private string _urlBase = "Cliente";
+    private string _urlPaginaLista => $"{_urlBase}";
+    #endregion
+
+    private zStage_EF_TestContext _dbContext { get; set; }
+    private ISmartForm _smartForm;
+
+    //Crea una connessione con il db
+    protected override void OnInitialized()
+    {
+        _dbContext = _dbFactory.CreateDbContext();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        // Solo la prima volta (come OnInitialized())
+        if (!firstRender)
+            return;
+
+        try
+        {
+            if (_isNew)
+            {
+                if (String.IsNullOrEmpty(CopyFromPrimaryKeys))
+                {
+                    //
+                    // Nuovo
+                    //
+                    _item = new Cliente();
+
+                }
+                // else
+                // {
+                //     //
+                //     // Copy
+                //     //
+                //     PrimaryKeysClass copyprimaryKeys = new PrimaryKeysClass(typeof(Cliente), CopyFromPrimaryKeys);
+                //     Cliente itemToCopy = _dbContext.Cliente
+                //                     .Include(x => x.IdDirettoreNavigation)
+                //                     .Include(x => x.IdResponsabileNavigation)
+                //                     .FirstOrDefault(copyprimaryKeys.WhereClause, copyprimaryKeys.Parameters);
+                //     _item = new Cliente()
+                //         {
+                //             Nome = itemToCopy.Nome,
+                //             Immagine = itemToCopy.Immagine,
+                //             Indirizzo = itemToCopy.Indirizzo,
+                //             IdDirettore = itemToCopy.IdDirettore,
+                //             IdResponsabile = itemToCopy.IdResponsabile
+                //         };
+                // }
+
+                //abilito la modifica di default
+                _isDisabled = false;
+            }
+            else
+            {
+                //
+                // Modifica
+                //
+
+                // Ottengo l'Entità tramite chiavi
+                _primaryKeysClass = new PrimaryKeysClass(typeof(Cliente), PrimaryKeysParam);
+
+                _item = _dbContext.Cliente
+                                    .FirstOrDefault(_primaryKeysClass.WhereClause, _primaryKeysClass.Parameters);
+                _usernameRec = _item.Username;
+            }
+
+            _itemFound = _item != null;
+            StateHasChanged();
+        }
+        catch (Exception ex)
+        {
+            string error = "Errore imprevisto. Contattare un amministratore!";
+            _errorMessage.Show(error);
+            _logger.LogError(ex, error);
+        }
+    }
+
+    #region Buttons
+    private bool Save()
+    {
+        try
+        {
+            //Pulisco gli errori prima di salvare
+            _errorMessage.Clear();
+
+            //
+            // Validazione
+            //
+            bool isValid = _smartForm.IsValid();
+
+            // Se la validazione è andata a buon fine, aggiungo o aggiorno il record
+            if (isValid)
+            {
+                if (_dbContext.Cliente.Any(x => x.Username == _item.Username && x.Username != _usernameRec))
+                {
+                    string error = "Userneme già utilizzato";
+                    _errorMessage.Show(error);
+                    return false;
+                }
+                if (_isNew)
+                {
+                    _dbContext.Cliente.Add(_item);
+                }
+                else
+                {
+                    _usernameRec = _item.Username;
+                    _dbContext.Cliente.Update(_item);
+                }
+                //Salvo il record sul DB
+                // non uso il save Async perchè il dispose potrebbe scattare prima della fine del salvataggio!
+                _dbContext.SaveChanges();
+                // Aggiorno le primary Keys in modo da dire alla LISTA che il record è stato aggiunto cambiato
+                _primaryKeysClass = new(typeof(Cliente), _item, _isNew);
+            }
+            return isValid;
+
+        }
+        catch (DbUpdateConcurrencyException ex) //Concurrency https://docs.microsoft.com/en-us/ef/core/saving/concurrency
+        {
+            string error = $"Errore di concorrenza! \n{ex.Message}";
+            _errorMessage?.Show(error);
+            _logger.LogError(ex, error);
+            return false;
+        }
+        catch (DbUpdateException ex)
+        {
+            string error = $"Errore durante il salvataggio! \n{ex.InnerException?.Message}";
+            _errorMessage?.Show(error);
+            _logger.LogError(ex, error);
+            return false;
+        }
+        catch (Exception ex)
+        {
+            string error = "Errore imprevisto. Contattare un amministratore!";
+            _errorMessage?.Show(error);
+            _logger.LogError(ex, error);
+            return false;
+        }
+    }
+
+    public void Confirm()
+    {
+        if (Save())
+            _navigationManager.NavigateTo(_urlPaginaLista);
+    }
+
+    public void Apply()
+    {
+        if (Save())
+            if (_isNew)
+                _navigationManager.NavigateTo($"{_urlBase}/{_primaryKeysClass.PrimaryKeysWithoutState}");
+    }
+
+    public void Back()
+    {
+        _navigationManager.NavigateTo(_urlPaginaLista);
+    }
+
+    private void Delete()
+    {
+        try
+        {
+            //
+            // Rimuovo tutte le relazioni
+            //
+            // Carello
+            foreach (Carello item in _dbContext.Carello.Where(x => x.IdCliente == _item.IdCliente))
+            {
+                _dbContext.Carello.Remove(item);
+            }
+
+
+            // Infine rimuovo l'entita principale
+            _dbContext.Cliente.Remove(_item);
+            _dbContext.SaveChanges();
+
+            // Imposto il record come eliminato, dico alla LISTA di toglierlo dalla cache e dalla griglia
+            _primaryKeysClass.SetAsDeleted();
+            _navigationManager.NavigateTo(_urlPaginaLista);
+        }
+        catch (InvalidOperationException ex)
+        {
+            if (ex.Message.Contains("has been severed, but the relationship is either marked as required or is implicitly required because the foreign key is not nullable"))
+            {
+                _errorMessage.Show($"Impossibile eliminare l'entità, verificare gli elementi associati. {ex.Message}");
+            }
+        }
+        catch (Exception ex)
+        {
+            string error = "Errore imprevisto. Contattare un amministratore!";
+            _errorMessage.Show(error);
+            _logger.LogError(ex, error);
+        }
+
+    }
+    #endregion
+
+    private void CheckFormInizialization(object sender, EventArgs e)
+    {
+        if (!_smartForm.IsInitalized)
+            return;
+
+        _isInizialized = true;
+        StateHasChanged();
+    }
+
+    private void SmartForm_OnError(SmartError smartError)
+    {
+        _errorMessage.Show(smartError.Exception.Message);
+    }
+
+    public void Dispose()
+    {
+        _dbContext?.Dispose();
+    }
+}
